@@ -315,7 +315,8 @@ def draw3D() :
 
     for tri in draw_queue :
         points = tri[0]
-        score = max([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]]) ##get furthest point (flip for inverted norms lol) ##get furthest point (flip for inverted norms lol)
+        #I don't really understand how this ended up working, I just kept trying stuff till it work :\
+        score = max([points[0][2],points[1][2],points[2][2]]) + min([points[0][2],points[1][2],points[2][2]]) + average([points[0][1],points[1][1],points[2][1]]) + average([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]])
         z_depths[str(tri)] = score
     
     for tri in sorted(draw_queue, key = lambda x : z_depths[str(x)],reverse=True) : ##sort based on "z score"
