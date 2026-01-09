@@ -10,6 +10,15 @@ Canvas = tkinter.Canvas(root,background="black") ##create canvas item and attach
 
 Frame = tkinter.Frame(root)
 
+fps_label = ttk.Label(Frame,text="0",foreground="white",background="black",anchor="center",compound="left")
+fps_label.pack()
+
+##set these to "pack" instead of grid
+Frame.pack(side="top",anchor="nw")
+Canvas.pack(fill="both",side="bottom")
+
+
+
 class quick_math() :
     
     pi : float = 3.14159
@@ -235,6 +244,12 @@ tile.rotate_x(15)
 tile.move_y(.1)
 tile.move_z(2)
 
+cube3 = Mesh3D("litle guy",cube_mesh,COLOR(0.35,0,0.75))
+cube3.scale = 0.5
+cube3.move_z(-1)
+cube3.move_x(0.5)
+cube3.move_y(-0.25)
+
 camera = WorldCamera("camera")
 
 def ready() :
@@ -256,14 +271,18 @@ def ready() :
                 floor.move_z(y*floor_size)
                 floor.move_y(-0.5)
 
-def drawGUI(fps : int) :
-    ttk.Label(Frame,text=str(fps),padding=15)
-    print(fps)
+def drawGUI() :
+    
+    pass
+
+def UpdateFPS_display(fps : int) :
+    fps_label.config(text=str(fps) + " -fps")
     
 
 sun_angle = (.1,-1,0)
     
 def draw3D() :
+
     tile.rotate_y(0.1)
     tile.rotate_x(0.2)
     
@@ -311,16 +330,17 @@ def draw3D() :
                 
                 face_index += 1
 
-    z_depths = {}
+    z_buffer = []
 
     for tri in draw_queue :
         points = tri[0]
         #I don't really understand how this ended up working, I just kept trying stuff till it work :\
         score = max([points[0][2],points[1][2],points[2][2]]) + min([points[0][2],points[1][2],points[2][2]]) + average([points[0][1],points[1][1],points[2][1]]) + average([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]])
-        z_depths[str(tri)] = score
+        z_buffer.append([tri,score])
     
-    for tri in sorted(draw_queue, key = lambda x : z_depths[str(x)],reverse=True) : ##sort based on "z score"
-        draw_triangle(tri[0],tri[1])
+    for tri in sorted(z_buffer, key = lambda x :x[1],reverse=True) : ##sort based on "z score"
+        draw_triangle(tri[0][0],tri[0][1])
+
 
 def draw_triangle(triangle : list,color : COLOR,fill : bool = True) -> bool :
     
@@ -387,7 +407,7 @@ def total(values : list) -> float :
     return total
 
 def average(values : list) -> float :
-    return total(values) * (1/len(values))
+    return total(values) / len(values)
 
 def combine_vec3(l1 : list, l2 : list, subtract : bool = False) -> list :
 
@@ -474,9 +494,7 @@ def process() :
 
         input_check(deltatime)
         draw3D()
-        drawGUI(fps)
-        Canvas.pack() ##pack everything into the window
-        Frame.pack()
+        
         root.update() ##update window
 
         fps += 1
@@ -484,6 +502,7 @@ def process() :
         fps_stop += deltatime 
         if fps_stop >= 1 : 
             fps_stop = 0
+            UpdateFPS_display(fps)
             fps = 0
 
         
@@ -491,4 +510,3 @@ def process() :
 ready()
 
 process()
-
