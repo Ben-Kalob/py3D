@@ -6,7 +6,7 @@ from tkinter import ttk
 
 root = tkinter.Tk(className="Py3D v2") ##create base for window and give it a title
 
-Canvas = tkinter.Canvas(root,background="black") ##create canvas item and attach it to the window
+Canvas = tkinter.Canvas(root,background="teal") ##create canvas item and attach it to the window
 
 Frame = tkinter.Frame(root)
 
@@ -245,7 +245,7 @@ tile.move_y(.1)
 tile.move_z(2)
 
 cube3 = Mesh3D("litle guy",cube_mesh,COLOR(0.35,0,0.75))
-cube3.scale = 0.5
+cube3.scale = 0.25
 cube3.move_z(-1)
 cube3.move_x(0.5)
 cube3.move_y(-0.25)
@@ -334,11 +334,13 @@ def draw3D() :
 
     for tri in draw_queue :
         points = tri[0]
+        centriod = [average([points[0][0],points[1][0],points[2][0]]),average([points[0][1],points[1][1],points[2][1]]),average([points[0][2],points[1][2],points[2][2]])]
         #I don't really understand how this ended up working, I just kept trying stuff till it work :\
-        score = max([points[0][2],points[1][2],points[2][2]]) + min([points[0][2],points[1][2],points[2][2]]) + average([points[0][1],points[1][1],points[2][1]]) + average([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]])
+        score = -distance([0,0,0],centriod)
+        #max([points[0][2],points[1][2],points[2][2]]) + min([points[0][2],points[1][2],points[2][2]]) + average([points[0][1],points[1][1],points[2][1]]) + average([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]])
         z_buffer.append([tri,score])
     
-    for tri in sorted(z_buffer, key = lambda x :x[1],reverse=True) : ##sort based on "z score"
+    for tri in sorted(z_buffer, key = lambda x :x[1],reverse=False) : ##sort based on "z score"
         draw_triangle(tri[0][0],tri[0][1])
 
 
