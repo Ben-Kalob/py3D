@@ -1,6 +1,9 @@
 import math
 import time
 
+import threading
+from threading import Thread
+
 import tkinter
 from tkinter import ttk
 
@@ -290,59 +293,95 @@ def draw3D() :
     draw_queue = []
     for object in Mesh3D.class_objects :
         if object.visible :
-            object_mesh = object.mesh
-            face_index : int = 0
-            for face in object_mesh[1] :
-                
-                tri = [object_mesh[0][face[0]-1],object_mesh[0][face[1]-1],object_mesh[0][face[2]-1]]
-                
-                position = combine_vec3(object.position.copy(),camera.position.copy(),True)
-                rotation : list = object.rotation.copy()
-
-                scale = object.scale
-
-                tri = [transform_scale(tri[0],scale),transform_scale(tri[1],scale),transform_scale(tri[2],scale)]
-
-                tri = [transform_rotation(tri[0],rotation),transform_rotation(tri[1],rotation),transform_rotation(tri[2],rotation)]
-
-                tri = [transform_position(tri[0],position),transform_position(tri[1],position),transform_position(tri[2],position)]
-
-                ##camera rotation has to be applied after the first in order to work correctly
-                cam_rot = combine_vec3([0,0,0],camera.rotation.copy(),True) ##invert 
-                tri = [transform_rotation(tri[0],cam_rot),transform_rotation(tri[1],cam_rot),transform_rotation(tri[2],cam_rot)]
-
-                ##if behind camera, skip rendering ##pretty important
-                if tri[0][2] < camera.near_cull_distance :
-                    break
-                if tri[1][2] < camera.near_cull_distance :
-                    break
-                if tri[2][2] < camera.near_cull_distance :
-                    break
-                
-                ##currently using a distance based shader where in it is brighter the closer an object is - it's not great
-                dis = max([tri[0][2],tri[1][2],tri[2][2]])
-                color = object.color 
-                if len(object_mesh) >= 3 :
-                    color *= 1-(distance(sun_angle,transform_rotation(object_mesh[2][face_index],rotation)) - 0.75)
-                
-                if dis < camera.far_cull_distance :
-                    draw_queue.append([tri,color])
-                
-                face_index += 1
+            calc_object(object,draw_queue)
+            #obj_thread = Thread(target=calc_object,args=(object,draw_queue))
+            #obj_thread.start()
 
     z_buffer = []
 
+    threads : list[Thread] = []
+
     for tri in draw_queue :
         points = tri[0]
-        centriod = [average([points[0][0],points[1][0],points[2][0]]),average([points[0][1],points[1][1],points[2][1]]),average([points[0][2],points[1][2],points[2][2]])]
+        #centriod = [average([points[0][0],points[1][0],points[2][0]]),average([points[0][1],points[1][1],points[2][1]]),average([points[0][2],points[1][2],points[2][2]])]
         #I don't really understand how this ended up working, I just kept trying stuff till it work :\
-        score = -distance([0,0,0],centriod)
+        
         #max([points[0][2],points[1][2],points[2][2]]) + min([points[0][2],points[1][2],points[2][2]]) + average([points[0][1],points[1][1],points[2][1]]) + average([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]])
-        z_buffer.append([tri,score])
+        calc_z_score(tri,points,z_buffer)
+
+        #t = Thread(target=calc_z_score,args=(tri,points,z_buffer))
+        #threads.append(t)
     
-    for tri in sorted(z_buffer, key = lambda x :x[1],reverse=False) : ##sort based on "z score"
+    #for thread in threads :
+    #    thread.start()
+    #for thread in threads :
+    #    thread.join()
+
+
+    for tri in sorted(z_buffer, key = lambda x :x[1],reverse=True) : ##sort based on "z score"
         draw_triangle(tri[0][0],tri[0][1])
 
+def calc_z_score(tri,points,buffer : list) :
+    score = min([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]]) + max([points[0][2],points[1][2],points[2][2]]) + min([points[0][1],points[1][1],points[2][1]])
+    buffer.append([tri,score])
+        
+def calc_object(object,draw_queue : list):
+    object_mesh = object.mesh
+    threads : list[Thread] = []
+    for face_index in range(len(object_mesh[1])) :
+        face_obj = []
+        #thread = Thread(target=calc_face,args=(object_mesh[1][face_index],object,object_mesh,face_index,draw_queue))
+        #threads.append(thread)
+        #thread.join()
+        
+        calc_face(object_mesh[1][face_index],object,object_mesh,face_index,draw_queue)
+        #if face_obj != [] :
+        #    draw_queue.append(face_obj)
+        #Thread(target=calc_face,args=(face,draw_queue,object_mesh)).start()
+    for thread in threads :
+        thread.start()
+        
+    for thread in threads :
+        thread.join()
+        
+        
+def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
+    tri = [object_mesh[0][face[0]-1],object_mesh[0][face[1]-1],object_mesh[0][face[2]-1]]
+    
+    position = combine_vec3(object.position.copy(),camera.position.copy(),True)
+    rotation : list = object.rotation.copy()
+
+    scale = object.scale
+
+    tri = [transform_scale(tri[0],scale),transform_scale(tri[1],scale),transform_scale(tri[2],scale)]
+
+    tri = [transform_rotation(tri[0],rotation),transform_rotation(tri[1],rotation),transform_rotation(tri[2],rotation)]
+
+    tri = [transform_position(tri[0],position),transform_position(tri[1],position),transform_position(tri[2],position)]
+
+    ##camera rotation has to be applied after the first in order to work correctly
+    cam_rot = combine_vec3([0,0,0],camera.rotation.copy(),True) ##invert 
+    tri = [transform_rotation(tri[0],cam_rot),transform_rotation(tri[1],cam_rot),transform_rotation(tri[2],cam_rot)]
+
+    ##if behind camera, skip rendering ##pretty important
+    if tri[0][2] < camera.near_cull_distance :
+        return None
+    if tri[1][2] < camera.near_cull_distance :
+        return None
+    if tri[2][2] < camera.near_cull_distance :
+        return None
+    
+    ##currently using a distance based shader where in it is brighter the closer an object is - it's not great
+    dis = max([tri[0][2],tri[1][2],tri[2][2]])
+    color = object.color 
+    if len(object_mesh) >= 3 :
+        color *= 1-(distance(sun_angle,transform_rotation(object_mesh[2][face_index],rotation)) - 0.75)
+    
+    if dis < camera.far_cull_distance :
+        face_obj.append([tri,color])
+        return face_obj
+    
+    face_index += 1
 
 def draw_triangle(triangle : list,color : COLOR,fill : bool = True) -> bool :
     
@@ -496,7 +535,7 @@ def process() :
 
         input_check(deltatime)
         draw3D()
-        
+
         root.update() ##update window
 
         fps += 1
