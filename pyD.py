@@ -1,11 +1,19 @@
+##NOTES
+##make .exe file with [pyinstaller "C:\Users\justl\Programs\Python projects\Py3D.py"] command (need pyinstaller)
+
+import os
+import sys
+
 import math
 import time
 
-import threading
-from threading import Thread
+#import threading
+#from threading import Thread
 
 import tkinter
 from tkinter import ttk
+
+from PIL import ImageTk, Image
 
 root = tkinter.Tk(className="Py3D v2") ##create base for window and give it a title
 
@@ -20,7 +28,9 @@ fps_label.pack()
 Frame.pack(side="top",anchor="nw")
 Canvas.pack(fill="both",side="bottom")
 
-
+def load_image(img_path : str) -> ImageTk.PhotoImage :
+    np : str = os.path.dirname(os.path.realpath(__file__)).replace("\\","/") + "/" + img_path
+    return ImageTk.PhotoImage(Image.open(np))
 
 class quick_math() :
     
@@ -66,8 +76,6 @@ class quick_math() :
 
     def deg_to_rad(degree : float) -> float :
         return (degree * math.pi)  * quick_math.rtdv
-
-
 
 class INPUT_STRUCTURE :
     
@@ -130,6 +138,8 @@ class WINDOW() :
     def __init__(self):
         self.x_offset = 0
         self.y_offset = 0
+        self.x_scale = 0
+        self.y_scale = 0
     
 
 ##MESHES
@@ -159,6 +169,12 @@ shape_sphere_vert = [(-0.0,-0.19509,-0.980785),(0.587938,0.392847,-0.707107),(0.
 sphere_mesh = [shape_sphere_vert,shape_sphere_order]
 
 
+class BUFFERED_OBJ() :
+    def __init__(self,data : list = [],type = None):
+        self.data = data
+        self.type = type
+        self.z_score = 0
+
 class Node :
     
     request_update = False
@@ -171,12 +187,15 @@ class Node :
 
 class Node3D(Node) :
 
+    class_objects : list = []
+
     def __init__(self,object_name):
         self.name = object_name
         self.position = [0,0,0]
         self.rotation = [0,0,0]
         self.visible = True
         self.scale = 1
+        Node3D.class_objects.append(self)
         super().__init__()
 
     def rotate_x(self,angle,should_wrap : bool = False) :
@@ -209,14 +228,17 @@ class Node3D(Node) :
         new_z = self.position[2] + distance
         self.position = [self.position[0],self.position[1],new_z]
 
-class Mesh3D(Node3D) :
+class BillBoard3D(Node3D) :
+    def __init__(self,object_name,image : ImageTk.PhotoImage):
+        self.image = image
+        
+        super().__init__(object_name)
 
-    class_objects = []
+class Mesh3D(Node3D) :
 
     def __init__(self,object_name,mesh : list,color : COLOR):
         self.mesh = mesh
         self.color = color
-        Mesh3D.class_objects.append(self)
         #print(Mesh3D.class_objects)
         super().__init__(object_name)
     
@@ -252,6 +274,9 @@ cube3.scale = 0.25
 cube3.move_z(-1)
 cube3.move_x(0.5)
 cube3.move_y(-0.25)
+
+sadcatbill = BillBoard3D("sadcar",load_image("sadcat.jpg"))
+sadcatbill.move_z(-1)
 
 camera = WorldCamera("camera")
 
@@ -290,24 +315,23 @@ def draw3D() :
     tile.rotate_x(0.2)
     
     Canvas.delete("all") ##clear screen
-    draw_queue = []
-    for object in Mesh3D.class_objects :
+    draw_queue : list[BUFFERED_OBJ] = []
+    for object in Node3D.class_objects :
         if object.visible :
             calc_object(object,draw_queue)
             #obj_thread = Thread(target=calc_object,args=(object,draw_queue))
-            #obj_thread.start()
+            #threads.append(obj_thread)
 
-    z_buffer = []
-
-    threads : list[Thread] = []
-
-    for tri in draw_queue :
-        points = tri[0]
+    for obj in draw_queue :
         #centriod = [average([points[0][0],points[1][0],points[2][0]]),average([points[0][1],points[1][1],points[2][1]]),average([points[0][2],points[1][2],points[2][2]])]
         #I don't really understand how this ended up working, I just kept trying stuff till it work :\
         
         #max([points[0][2],points[1][2],points[2][2]]) + min([points[0][2],points[1][2],points[2][2]]) + average([points[0][1],points[1][1],points[2][1]]) + average([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]])
-        calc_z_score(tri,points,z_buffer)
+        
+        if obj.type == BillBoard3D : ##add billboard
+            obj.z_score = distance([0,0,0],obj.data[1])
+        elif obj.type == Mesh3D :
+            obj.z_score = calc_z_score(obj.data[0])
 
         #t = Thread(target=calc_z_score,args=(tri,points,z_buffer))
         #threads.append(t)
@@ -318,31 +342,37 @@ def draw3D() :
     #    thread.join()
 
 
-    for tri in sorted(z_buffer, key = lambda x :x[1],reverse=True) : ##sort based on "z score"
-        draw_triangle(tri[0][0],tri[0][1])
+    for obj in sorted(draw_queue, key = lambda x :x.z_score,reverse=True) : ##sort based on "z score"
+        if obj.type == Mesh3D :
+            draw_triangle(obj.data[0],obj.data[1])
+        elif obj.type == BillBoard3D :
+            position = screen_plot(obj.data[1])
+            if not type(position) == bool :
+                Canvas.create_image(position[0],position[1],image = obj.data[0])
+            
 
-def calc_z_score(tri,points,buffer : list) :
+def calc_z_score(points) :
     score = min([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]]) + max([points[0][2],points[1][2],points[2][2]]) + min([points[0][1],points[1][1],points[2][1]])
-    buffer.append([tri,score])
+    return score
+    #buffer.append([score,tri])
         
 def calc_object(object,draw_queue : list):
-    object_mesh = object.mesh
-    threads : list[Thread] = []
-    for face_index in range(len(object_mesh[1])) :
-        face_obj = []
-        #thread = Thread(target=calc_face,args=(object_mesh[1][face_index],object,object_mesh,face_index,draw_queue))
-        #threads.append(thread)
-        #thread.join()
+
+    if type(object) is Mesh3D :
+
+        object_mesh = object.mesh
         
-        calc_face(object_mesh[1][face_index],object,object_mesh,face_index,draw_queue)
-        #if face_obj != [] :
-        #    draw_queue.append(face_obj)
-        #Thread(target=calc_face,args=(face,draw_queue,object_mesh)).start()
-    for thread in threads :
-        thread.start()
-        
-    for thread in threads :
-        thread.join()
+        for face_index in range(len(object_mesh[1])) :
+            calc_face(object_mesh[1][face_index],object,object_mesh,face_index,draw_queue)
+
+
+    elif type(object) is BillBoard3D :
+        np = combine_vec3(object.position.copy(),camera.position.copy(),True)
+        cam_rot = combine_vec3([0,0,0],camera.rotation.copy(),True) ##invert 
+        #np = transform_position(np,position)
+        np = transform_rotation(np,cam_rot)
+
+        draw_queue.append(BUFFERED_OBJ(data=[object.image,np],type=BillBoard3D))
         
         
 def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
@@ -378,7 +408,7 @@ def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
         color *= 1-(distance(sun_angle,transform_rotation(object_mesh[2][face_index],rotation)) - 0.75)
     
     if dis < camera.far_cull_distance :
-        face_obj.append([tri,color])
+        face_obj.append(BUFFERED_OBJ(data=[tri,color],type=Mesh3D))
         return face_obj
     
     face_index += 1
@@ -459,8 +489,6 @@ def combine_vec3(l1 : list, l2 : list, subtract : bool = False) -> list :
     x = (l1[0] + l2[0])
     y = (l1[1] + l2[1])
     z = (l1[2] + l2[2])
-
-    breakpoint
     
     return [x,y,z]
 
@@ -478,7 +506,7 @@ key_down = INPUT_STRUCTURE("Down")
 key_ESC = INPUT_STRUCTURE("~")
 
 def await_key(key : INPUT_STRUCTURE) :
-    while not key.just_pressed :
+    while not key.is_pressed :
         pass
     return
 
@@ -535,7 +563,7 @@ def process() :
 
         input_check(deltatime)
         draw3D()
-
+        
         root.update() ##update window
 
         fps += 1
