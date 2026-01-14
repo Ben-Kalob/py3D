@@ -28,9 +28,16 @@ fps_label.pack()
 Frame.pack(side="top",anchor="nw")
 Canvas.pack(fill="both",side="bottom")
 
-def load_image(img_path : str) -> ImageTk.PhotoImage :
-    np : str = os.path.dirname(os.path.realpath(__file__)).replace("\\","/") + "/" + img_path
-    return ImageTk.PhotoImage(Image.open(np))
+def load_image(img_path : str,scale : float = 1) -> ImageTk.PhotoImage :
+    np : str = get_real_path(img_path)
+    img = Image.open(np)
+    if scale >= 0.01 :
+        scale = quick_math.clampf(scale,0.1,5)
+        img = img.resize(size = (int(img.width*scale),int(img.height*scale)),resample=0)
+    return ImageTk.PhotoImage(image=img)
+
+def get_real_path(path : str) :
+    return os.path.dirname(os.path.realpath(__file__)).replace("\\","/") + "/" + path
 
 class quick_math() :
     
@@ -229,8 +236,9 @@ class Node3D(Node) :
         self.position = [self.position[0],self.position[1],new_z]
 
 class BillBoard3D(Node3D) :
-    def __init__(self,object_name,image : ImageTk.PhotoImage):
-        self.image = image
+    def __init__(self,object_name,img_path : str):
+        self.img_path = img_path
+        self.image : tkinter.PhotoImage = load_image(img_path)
         
         super().__init__(object_name)
 
@@ -239,7 +247,7 @@ class Mesh3D(Node3D) :
     def __init__(self,object_name,mesh : list,color : COLOR):
         self.mesh = mesh
         self.color = color
-        #print(Mesh3D.class_objects)
+
         super().__init__(object_name)
     
 class WorldCamera(Node3D) :
@@ -250,7 +258,7 @@ class WorldCamera(Node3D) :
         self.rotation = [0,0,0]
         
         self.focal = 1/1200
-        self.near_cull_distance = -0.5
+        self.near_cull_distance = 0.1
         self.far_cull_distance = 10
 
 
@@ -259,26 +267,32 @@ Window = WINDOW()
 running = True
 
 cube = Mesh3D("bobby",cube_mesh,COLOR(1,0,0))
+cube.move_y(0.5)
 
-cube2 = Mesh3D("bobby",cube_mesh,COLOR(0,1,0))
+cube2 = Mesh3D("bobby2",cube_mesh,COLOR(0,1,0))
 cube2.move_x(2)
+cube2.move_y(1)
 
 tile = Mesh3D("test tile",plane_mesh,COLOR(1,1,1))
 tile.rotate_y(35)
 tile.rotate_x(15)
-tile.move_y(.1)
+tile.move_y(1.1)
 tile.move_z(2)
 
 cube3 = Mesh3D("litle guy",cube_mesh,COLOR(0.35,0,0.75))
 cube3.scale = 0.25
 cube3.move_z(-1)
 cube3.move_x(0.5)
-cube3.move_y(-0.25)
+cube3.move_y(0.25)
 
-sadcatbill = BillBoard3D("sadcar",load_image("sadcat.jpg"))
-sadcatbill.move_z(-1)
+sadcatbill = BillBoard3D("sadcar","sadcat.png")
+sadcatbill.move_z(4)
+sadcatbill.move_y(1)
+sadcatbill.scale = 0.5
+
 
 camera = WorldCamera("camera")
+camera.move_y(1)
 
 def ready() :
     global timestamp 
@@ -297,7 +311,7 @@ def ready() :
                 floor.scale = floor_size
                 floor.move_x(x*floor_size)
                 floor.move_z(y*floor_size)
-                floor.move_y(-0.5)
+                #floor.move_y(0)
 
 def drawGUI() :
     
@@ -329,7 +343,8 @@ def draw3D() :
         #max([points[0][2],points[1][2],points[2][2]]) + min([points[0][2],points[1][2],points[2][2]]) + average([points[0][1],points[1][1],points[2][1]]) + average([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]])
         
         if obj.type == BillBoard3D : ##add billboard
-            obj.z_score = distance([0,0,0],obj.data[1])
+            pos = obj.data[1]
+            obj.z_score = pos[2] + pos[2]
         elif obj.type == Mesh3D :
             obj.z_score = calc_z_score(obj.data[0])
 
@@ -341,15 +356,17 @@ def draw3D() :
     #for thread in threads :
     #    thread.join()
 
-
-    for obj in sorted(draw_queue, key = lambda x :x.z_score,reverse=True) : ##sort based on "z score"
+    for obj in sorted(draw_queue, key = lambda x :x.z_score,reverse=True) : ##sorted based on "z score"
         if obj.type == Mesh3D :
             draw_triangle(obj.data[0],obj.data[1])
         elif obj.type == BillBoard3D :
             position = screen_plot(obj.data[1])
             if not type(position) == bool :
-                Canvas.create_image(position[0],position[1],image = obj.data[0])
-            
+                st : BillBoard3D = obj.data[2]
+                scale = ( camera.far_cull_distance/obj.z_score  ) * st.scale
+                st.image = load_image(st.img_path,scale)
+                Canvas.create_image(position[0],position[1],image = st.image)
+
 
 def calc_z_score(points) :
     score = min([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]]) + max([points[0][2],points[1][2],points[2][2]]) + min([points[0][1],points[1][1],points[2][1]])
@@ -372,7 +389,8 @@ def calc_object(object,draw_queue : list):
         #np = transform_position(np,position)
         np = transform_rotation(np,cam_rot)
 
-        draw_queue.append(BUFFERED_OBJ(data=[object.image,np],type=BillBoard3D))
+        if np[2] < camera.far_cull_distance and np[2] > camera.near_cull_distance * 2 :
+            draw_queue.append(BUFFERED_OBJ(data=[object.image,np,object],type=BillBoard3D))
         
         
 def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
@@ -394,12 +412,9 @@ def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
     tri = [transform_rotation(tri[0],cam_rot),transform_rotation(tri[1],cam_rot),transform_rotation(tri[2],cam_rot)]
 
     ##if behind camera, skip rendering ##pretty important
-    if tri[0][2] < camera.near_cull_distance :
+    if max([tri[0][2],tri[1][2],tri[2][2]]) < camera.near_cull_distance :
         return None
-    if tri[1][2] < camera.near_cull_distance :
-        return None
-    if tri[2][2] < camera.near_cull_distance :
-        return None
+    
     
     ##currently using a distance based shader where in it is brighter the closer an object is - it's not great
     dis = max([tri[0][2],tri[1][2],tri[2][2]])
