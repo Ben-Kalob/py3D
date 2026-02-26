@@ -170,10 +170,13 @@ sphere_mesh = [shape_sphere_vert,shape_sphere_order]
 
 
 class BUFFERED_OBJ() :
-    def __init__(self,data : list = [],type = None):
-        self.data = data
+    def __init__(self,data : list = [],type = None,world_position : list[float] = [0,0],normal : list[float] = [0,0]):
+        self.data : list = data
+        self.world_position : list[float] = world_position
         self.type = type
-        self.z_score = 0
+        self.z_score : float = 0
+        self.light_energy : float = 0
+        self.normal : list[float] = normal
 
 class Node :
     
@@ -228,6 +231,16 @@ class Node3D(Node) :
         new_z = self.position[2] + distance
         self.position = [self.position[0],self.position[1],new_z]
 
+class Light3D(Node3D) :
+
+    all_lights : list[Light3D] = []
+
+    def __init__(self, object_name,energy : float,size : float = 10):
+        self.energy = energy
+        self.size = size
+        self.all_lights.append(self)
+        super().__init__(object_name)
+
 class BillBoard3D(Node3D) :
     def __init__(self,object_name,img_path : str):
         self.img_path = img_path
@@ -260,10 +273,11 @@ Window = WINDOW(size=(800,600))
 
 running = True
 
-cube = Mesh3D("bobby",cube_mesh,COLOR(1,0,0))
+cube = Mesh3D("bobby",cube_mesh,COLOR(0.1,0,0))
 cube.move_y(0.5)
+cube.rotate_y(45)
 
-cube2 = Mesh3D("bobby2",cube_mesh,COLOR(0,1,0))
+cube2 = Mesh3D("bobby2",cube_mesh,COLOR(0,0.1,0))
 cube2.move_x(2)
 cube2.move_y(1)
 
@@ -273,7 +287,7 @@ tile.rotate_x(15)
 tile.move_y(1.1)
 tile.move_z(2)
 
-cube3 = Mesh3D("litle guy",cube_mesh,COLOR(0.35,0,0.75))
+cube3 = Mesh3D("litle guy",cube_mesh,COLOR(0.1,0,0.5))
 cube3.scale = 0.25
 cube3.move_z(-1)
 cube3.move_x(0.5)
@@ -284,9 +298,18 @@ sadcatbill.move_z(4)
 sadcatbill.move_y(1)
 sadcatbill.scale = 1
 
-
 camera = WorldCamera("camera")
 camera.move_y(1)
+
+light1 = Light3D("light",1,8)
+light1.move_y(1)
+light1.move_x(-3)
+
+light3 = Light3D("light",1,8)
+light3.move_y(5)
+light3.move_x(3)
+light3.move_z(3)
+
 
 def ready() :
     global timestamp 
@@ -316,7 +339,23 @@ def UpdateFPS_display(fps : int) :
     
 
 sun_angle = (.1,-1,0)
-    
+
+def get_normal_dir(from_point : list,to_point : list) -> list :
+    x_dir = 0
+    y_dir = 0
+    z_dir = 0
+
+    if from_point[0] < to_point[0] : x_dir = -1
+    else : x_dir = 1
+
+    if from_point[1] < to_point[1] : y_dir = -1
+    else : y_dir = 1
+
+    if from_point[2] < to_point[2] : z_dir = -1
+    else : z_dir = 1
+
+    return [x_dir,y_dir,z_dir]
+
 def draw3D() :
 
     tile.rotate_y(0.1)
@@ -338,22 +377,38 @@ def draw3D() :
         
         if obj.type == BillBoard3D : ##add billboard
             pos = obj.data[1]
-            obj.z_score = pos[2] + pos[2]
+            obj.z_score = 2 * pos[2]
         elif obj.type == Mesh3D :
             obj.z_score = calc_z_score(obj.data[0])
-
-        #t = Thread(target=calc_z_score,args=(tri,points,z_buffer))
-        #threads.append(t)
     
-    #for thread in threads :
-    #    thread.start()
-    #for thread in threads :
-    #    thread.join()
+    for light in Light3D.all_lights :
+        for obj in draw_queue :
+            if obj.type == Mesh3D :
+                dis : float = distance(light.position,obj.world_position)
+                if dis <= light.size :
+                    
+                    direction = get_normal_dir(light.position,obj.world_position)
+                    
+                    diff = average([abs(direction[0]+obj.normal[0]),abs(direction[1]+obj.normal[1]),abs(direction[2]+obj.normal[2])])
+
+                    power = light.energy / (dis/light.size)
+                    obj.light_energy += power * diff
+
+                    #diff = distance(obj.normal,direction)
+                    #print(diff)
+
+
+                    #    power = light.energy / (dis/light.size)
+                    #    obj.light_energy += power
+
 
     for obj in sorted(draw_queue, key = lambda x :x.z_score,reverse=True) : ##sorted based on "z score"
         if obj.type == Mesh3D :
+            
+            mod_color : COLOR = obj.data[1]
+            mod_color *= obj.light_energy
 
-            draw_triangle(obj.data[0],obj.data[1])
+            draw_triangle(obj.data[0],mod_color)
 
         elif obj.type == BillBoard3D :
 
@@ -394,7 +449,7 @@ def calc_object(object,draw_queue : list):
         np = transform_rotation(np,cam_rot)
 
         if np[2] < camera.far_cull_distance and np[2] > camera.near_cull_distance * 4 :
-            draw_queue.append(BUFFERED_OBJ(data=[object.image,np,object],type=BillBoard3D))
+            draw_queue.append(BUFFERED_OBJ(data=[object.image,np,object],type=BillBoard3D,world_position=object.position))
         
         
 def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
@@ -422,11 +477,13 @@ def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
     ##currently using a distance based shader where in it is brighter the closer an object is - it's not great
     dis = max([tri[0][2],tri[1][2],tri[2][2]])
     color = object.color 
-    if len(object_mesh) >= 3 :
-        color *= 1-(distance(sun_angle,transform_rotation(object_mesh[2][face_index],rotation)) - 0.75)
+
+    ##sun vertex lighting
+    #if len(object_mesh) >= 3 :
+    #    color *= 1-(distance(sun_angle,transform_rotation(object_mesh[2][face_index],rotation)) - 0.75)
     
     if dis < camera.far_cull_distance :
-        face_obj.append(BUFFERED_OBJ(data=[tri,color],type=Mesh3D))
+        face_obj.append(BUFFERED_OBJ(data=[tri,color,object_mesh],type=Mesh3D,world_position=object.position.copy(),normal=transform_rotation(object_mesh[2][face_index],rotation)))
         return face_obj
     
     face_index += 1
@@ -439,7 +496,7 @@ def draw_triangle(triangle : list,color : COLOR,fill : bool = True) -> bool :
     if not mid_point : return False
     end_point = screen_plot(triangle[2])
     if not end_point : return False
-    
+
     Canvas.create_polygon(start_point,mid_point,end_point,fill=color.get_hex())
 
     return True
