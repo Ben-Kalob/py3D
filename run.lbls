@@ -1,0 +1,9 @@
+{"type":"scene"}
+
+# quick exit - constant
+{"type" : "input", "key" : "Escape" , "func" : ";quit", "persist" : "true"}
+ # F1 restarts the program
+{"type" : "input", "key" : "F1" , "func" : ";load_script;run.lbls", "persist" : "true"}
+
+
+{"type" : "func", "path" : ";load_script;title.lbls"}
