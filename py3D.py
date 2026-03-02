@@ -1,25 +1,18 @@
 ##NOTES
 ##make .exe file with [pyinstaller "C:\Users\justl\Programs\Python projects\Py3D.py"] command (need pyinstaller)
 
-import os
-import sys
-
 import math
-import time
 
-import tkinter
-from tkinter import ttk
-
-from PIL import ImageTk, Image
+from Tree import *
 
 import qmath as quick_math
-
-from SysNav import get_real_path
 
 from Colourz import color
 
 from WinScreen import Window
 from image_handler import load_image
+
+from vectors import Vector3
 
 Engine = None
 
@@ -49,108 +42,14 @@ shape_sphere_vert = [(-0.0,-0.19509,-0.980785),(0.587938,0.392847,-0.707107),(0.
 
 sphere_mesh = [shape_sphere_vert,shape_sphere_order]
 
-
 class BUFFERED_OBJ() :
-    def __init__(self,data : list = [],type = None,world_position : list[float] = [0,0],normal : list[float] = [0,0]):
+    def __init__(self,data : list = [],type = None,world_position : Vector3 = Vector3(),normal : Vector3 = Vector3()):
         self.data : list = data
-        self.world_position : list[float] = world_position
+        self.world_position : Vector3 = world_position
         self.type = type
         self.z_score : float = 0
         self.light_energy : float = 0
-        self.normal : list[float] = normal
-
-class Node :
-    
-    request_update = False
-
-    def __init__(self):
-        pass
-
-    def update() :
-        pass
-
-class Node3D(Node) :
-
-    class_objects : list = []
-
-    def __init__(self,object_name):
-        self.name = object_name
-        self.position = [0,0,0]
-        self.rotation = [0,0,0]
-        self.visible = True
-        self.scale = 1
-        Node3D.class_objects.append(self)
-        super().__init__()
-
-    def rotate_x(self,angle,should_wrap : bool = False) :
-        new_x = self.rotation[0]+angle
-        if should_wrap :
-            new_x = quick_math.wrapf(angle,0,360)
-        self.rotation = [new_x,self.rotation[1],self.rotation[2]]
-
-    def rotate_y(self,angle,should_wrap : bool = False) :
-        new_y = self.rotation[1]+angle
-        if should_wrap :
-            new_y = quick_math.wrapf(new_y,0,360)
-        self.rotation = [self.rotation[0],new_y,self.rotation[2]]
-
-    def rotate_z(self,angle,should_wrap : bool = False) :
-        new_z = self.rotation[2]+angle
-        if should_wrap :
-            new_z = quick_math.wrapf(angle,0,360)
-        self.rotation = [self.rotation[0],self.rotation[1],new_z]
-    
-    def move_x(self,distance) :
-        new_x = self.position[0] + distance
-        self.position = [new_x,self.position[1],self.position[2]]
-
-    def move_y(self,distance) :
-        new_y = self.position[1] + distance
-        self.position = [self.position[0],new_y,self.position[2]]
-
-    def move_z(self,distance) :
-        new_z = self.position[2] + distance
-        self.position = [self.position[0],self.position[1],new_z]
-
-class Light3D(Node3D) :
-
-    all_lights : list[Light3D] = []
-
-    def __init__(self, object_name,energy : float,size : float = 10):
-        self.energy = energy
-        self.size = size
-        self.all_lights.append(self)
-        super().__init__(object_name)
-
-class BillBoard3D(Node3D) :
-    def __init__(self,object_name,img_path : str):
-        self.img_path = img_path
-        self.image : tkinter.PhotoImage = load_image(img_path)
-        self.image_scale = math.sqrt(pow(self.image.width(),2) + pow(self.image.height(),2)) /200
-
-        super().__init__(object_name)
-
-class Mesh3D(Node3D) :
-
-    def __init__(self,object_name,mesh : list,color : color):
-        self.mesh = mesh
-        self.color = color
-
-        super().__init__(object_name)
-    
-class WorldCamera(Node3D) :
-
-    def __init__(self, object_name):
-        self.name = object_name
-        self.position = [0,0,-3]
-        self.rotation = [0,0,0]
-        
-        self.focal = 1/1300
-        self.near_cull_distance = 0.05
-        self.far_cull_distance = 20
-
-
-running = True
+        self.normal : Vector3 = normal
 
 cube = Mesh3D("bobby",cube_mesh,color(0.1,0,0))
 cube.move_y(0.5)
@@ -179,28 +78,16 @@ cube3.move_y(0.25)
 
 camera = WorldCamera("camera")
 camera.move_y(1)
+camera.move_z(-5)
 
-light1 = Light3D("light",1,8)
+light1 = Light3D("light",1,5)
 light1.move_y(1)
 light1.move_x(-3)
 
-light3 = Light3D("light",1,8)
-light3.move_y(5)
-light3.move_x(3)
-light3.move_z(3)
-
-
-def ready() :
-    global timestamp 
-    timestamp = time.process_time()
-
-    ##make world floor 
-    enable_floor = True
-
-    floor_range = 5
-    floor_size = 1
-
-    if enable_floor :
+class Engine3D() :
+    def __init__(self):
+        floor_range = 5
+        floor_size = 1
         for x in range(-floor_range,floor_range) :
             for y in range(-floor_range,floor_range) :
                 floor = Mesh3D("floor",plane_mesh,color(0.1,0.1,0.1))
@@ -209,32 +96,27 @@ def ready() :
                 floor.move_z(y*floor_size)
                 #floor.move_y(0)
 
-def drawGUI() :
-    
-    pass
 
 def UpdateFPS_display(fps : int) :
     pass
     #fps_label.config(text=str(fps) + " -fps")
     
 
-sun_angle = (.1,-1,0)
-
-def get_normal_dir(from_point : list,to_point : list) -> list :
+def get_normal_dir(from_point : Vector3,to_point : Vector3) -> Vector3 :
     x_dir = 0
     y_dir = 0
     z_dir = 0
 
-    if from_point[0] < to_point[0] : x_dir = -1
+    if from_point.get_x() < to_point.get_x() : x_dir = -1
     else : x_dir = 1
 
-    if from_point[1] < to_point[1] : y_dir = -1
+    if from_point.get_y() < to_point.get_y() : y_dir = -1
     else : y_dir = 1
 
-    if from_point[2] < to_point[2] : z_dir = -1
+    if from_point.get_z() < to_point.get_z() : z_dir = -1
     else : z_dir = 1
 
-    return [x_dir,y_dir,z_dir]
+    return Vector3(x_dir,y_dir,z_dir)
 
 def Draw3D() :
 
@@ -257,7 +139,7 @@ def Draw3D() :
         
         if obj.type == BillBoard3D : ##add billboard
             pos = obj.data[1]
-            obj.z_score = 2 * pos[2]
+            obj.z_score = 2 * pos.get_z()
         elif obj.type == Mesh3D :
             obj.z_score = calc_z_score(obj.data[0])
     
@@ -269,7 +151,7 @@ def Draw3D() :
                     
                     direction = get_normal_dir(light.position,obj.world_position)
                     
-                    diff = average([abs(direction[0]+obj.normal[0]),abs(direction[1]+obj.normal[1]),abs(direction[2]+obj.normal[2])])
+                    diff = average([abs(direction.get_x()+obj.normal.get_x()),abs(direction.get_y()+obj.normal.get_y()),abs(direction.get_z()+obj.normal.get_z())])
 
                     power = light.energy / (dis/light.size)
                     obj.light_energy += power * diff
@@ -280,7 +162,6 @@ def Draw3D() :
 
                     #    power = light.energy / (dis/light.size)
                     #    obj.light_energy += power
-
 
     for obj in sorted(draw_queue, key = lambda x :x.z_score,reverse=True) : ##sorted based on "z score"
         if obj.type == Mesh3D :
@@ -306,11 +187,9 @@ def Draw3D() :
 
                     Engine.window.canvas.create_image(position[0],position[1],image = st.image)
                     
-
 def calc_z_score(points) :
     score = min([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]]) + max([points[0][2],points[1][2],points[2][2]]) + min([points[0][1],points[1][1],points[2][1]])
     return score
-    #buffer.append([score,tri])
         
 def calc_object(object,draw_queue : list):
 
@@ -321,22 +200,21 @@ def calc_object(object,draw_queue : list):
         for face_index in range(len(object_mesh[1])) :
             calc_face(object_mesh[1][face_index],object,object_mesh,face_index,draw_queue)
 
-
     elif type(object) is BillBoard3D :
-        np = combine_vec3(object.position.copy(),camera.position.copy(),True)
-        cam_rot = combine_vec3([0,0,0],camera.rotation.copy(),True) ##invert 
-        #np = transform_position(np,position)
+        np = combine_vec3(object.position,camera.position,True)
+        cam_rot = combine_vec3(Vector3(),camera.rotation,True) ##invert 
         np = transform_rotation(np,cam_rot)
 
-        if np[2] < camera.far_cull_distance and np[2] > camera.near_cull_distance * 4 :
+        if np.get_z() < camera.far_cull_distance and np.get_z > camera.near_cull_distance * 4 :
             draw_queue.append(BUFFERED_OBJ(data=[object.image,np,object],type=BillBoard3D,world_position=object.position))
         
-        
 def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
-    tri = [object_mesh[0][face[0]-1],object_mesh[0][face[1]-1],object_mesh[0][face[2]-1]]
+    tri : list = [object_mesh[0][face[0]-1],object_mesh[0][face[1]-1],object_mesh[0][face[2]-1]]
     
-    position = combine_vec3(object.position.copy(),camera.position.copy(),True)
-    rotation : list = object.rotation.copy()
+    print(tri)
+
+    position : Vector3 = combine_vec3(object.position,camera.position,True)
+    rotation : Vector3 = object.rotation
 
     scale = object.scale
 
@@ -347,23 +225,21 @@ def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
     tri = [transform_position(tri[0],position),transform_position(tri[1],position),transform_position(tri[2],position)]
 
     ##camera rotation has to be applied after the first in order to work correctly
-    cam_rot = combine_vec3([0,0,0],camera.rotation.copy(),True) ##invert 
+    cam_rot = combine_vec3(Vector3(),camera.rotation,True) ##invert 
     tri = [transform_rotation(tri[0],cam_rot),transform_rotation(tri[1],cam_rot),transform_rotation(tri[2],cam_rot)]
 
+    dis = max([tri[0][2],tri[1][2],tri[2][2]])
+
     ##if behind camera, skip rendering ##pretty important
-    if max([tri[0][2],tri[1][2],tri[2][2]]) < camera.near_cull_distance :
+    if dis < camera.near_cull_distance :
         return None
     
     ##currently using a distance based shader where in it is brighter the closer an object is - it's not great
-    dis = max([tri[0][2],tri[1][2],tri[2][2]])
+    
     color = object.color 
 
-    ##sun vertex lighting
-    #if len(object_mesh) >= 3 :
-    #    color *= 1-(distance(sun_angle,transform_rotation(object_mesh[2][face_index],rotation)) - 0.75)
-    
     if dis < camera.far_cull_distance :
-        face_obj.append(BUFFERED_OBJ(data=[tri,color,object_mesh],type=Mesh3D,world_position=object.position.copy(),normal=transform_rotation(object_mesh[2][face_index],rotation)))
+        face_obj.append(BUFFERED_OBJ(data=[tri,color,object_mesh],type=Mesh3D,world_position=object.position,normal=transform_rotation(object_mesh[2][face_index],rotation)))
         return face_obj
     
     face_index += 1
@@ -390,41 +266,41 @@ def screen_plot(point : list) -> any :
     new_point = ((point[0])*df + Engine.window.x_offset,(-point[1])*df + Engine.window.y_offset)
     return new_point
 
-def transform_position(point : list ,position : list) -> list :
+def transform_position(point : Vector3 ,position : Vector3) -> Vector3 :
     
     new_point = (point[0] + position[0],point[1] + position[1],point[2] + position[2])
     
     return new_point
 
-def transform_rotation(point : list, rotation : list) -> list :
+def transform_rotation(point : Vector3, rotation : Vector3) -> Vector3 :
 
-    z = rotate_2D_Vec((point[0],point[1]),quick_math.deg_to_rad(rotation[2]))
-    new_point = (z[0],z[1],point[2])
+    z : Vector3 = rotate_2D_Vec((point.get_x(),point.get_y()),quick_math.deg_to_rad(rotation.get_z()))
+    new_point = Vector3(z.get_x(),z.get_y(),point.get_z())
 
-    y = rotate_2D_Vec((new_point[0],new_point[2]),quick_math.deg_to_rad(rotation[1]))
-    new_point = (y[0],new_point[1],y[1])
+    y : Vector3 = rotate_2D_Vec((new_point.get_x(),new_point.get_z()),quick_math.deg_to_rad(rotation.get_y()))
+    new_point = Vector3(y.get_x(),new_point.get_y(),y.get_y())
 
-    x = rotate_2D_Vec((new_point[1],new_point[2]),quick_math.deg_to_rad(rotation[0]))
-    new_point = (new_point[0],x[0],x[1])
+    x : Vector3 = rotate_2D_Vec((new_point.get_x(),new_point.get_z()),quick_math.deg_to_rad(rotation.get_x()))
+    new_point = Vector3(new_point.get_x(),x.get_x(),x.get_y())
     
     return new_point
 
-def distance(point_1 : list, point_2 : list) -> float :
-    return math.sqrt( pow(point_2[0] - point_1[0],2) + pow(point_2[1] - point_1[1],2) + pow(point_2[2] - point_1[2],2) )
+def distance(point_1 : Vector3, point_2 : Vector3) -> float :
+    return math.sqrt( pow(point_2.get_x() - point_1.get_x(),2) + pow(point_2.get_y() - point_1.get_y(),2) + pow(point_2.get_z() - point_1.get_z(),2) )
 
-def transform_scale(point : list,scale) -> list :
-    point = [point[0]*scale,point[1]*scale,point[2]*scale]
+def transform_scale(point : list,scale) -> Vector3 :
+    point = Vector3(point[0]*scale,point[1]*scale,point[2]*scale)
     return point
 
-def rotate_2D_Vec(vector : list,angle) :
+def rotate_2D_Vec(vector : Vector3,angle : float) :
+    
+    s = math.sin(angle)
+    c = math.cos(angle)
 
-        s = math.sin(angle)
-        c = math.cos(angle)
+    x = c * vector[0] - s * vector[1]
+    y = s * vector[0] + c * vector[1]
 
-        x = c * vector[0] - s * vector[1]
-        y = s * vector[0] + c * vector[1]
-
-        return (x,y)
+    return (x,y)
 
 def total(values : list) -> float :
     total : float = 0
@@ -435,49 +311,16 @@ def total(values : list) -> float :
 def average(values : list) -> float :
     return total(values) / len(values)
 
-def combine_vec3(l1 : list, l2 : list, subtract : bool = False) -> list :
+def combine_vec3(l1 : Vector3, l2 : Vector3, subtract : bool = False) -> list :
 
-    if subtract : 
-        for i in range(len(l2)) :
-            l2[i] = l2[i] * -1
+    multi : int = 1
 
-    x = (l1[0] + l2[0])
-    y = (l1[1] + l2[1])
-    z = (l1[2] + l2[2])
-    
-    return [x,y,z]
+    if subtract : multi = -1
 
-def input_check(delta : float) :
-    pass
-    #Canvas.focus_force()
+    x = l1.get_x() + l2.get_x() * multi
+    y = l1.get_y() + l2.get_y() * multi
+    z = l1.get_z() + l2.get_z() * multi
 
-    #if key_ESC.is_pressed :
-    #    root.destroy()
+    return Vector3(x,y,z)
 
-    ##wasd
-    #if w_key.is_pressed :
-    #    forward_vec = rotate_2D_Vec((0,1),quick_math.deg_to_rad(camera.rotation[1]))
-    #    camera.move_x(forward_vec[0] * delta * 2)
-    #    camera.move_z(forward_vec[1] * delta * 2)
-    
-    #if s_key.is_pressed :
-    #    forward_vec = rotate_2D_Vec((0,-1),quick_math.deg_to_rad(camera.rotation[1]))
-    #    camera.move_x(forward_vec[0] * delta * 2)
-    #    camera.move_z(forward_vec[1] * delta * 2)
 
-    #if a_key.is_pressed :
-    #    forward_vec = rotate_2D_Vec((-1,0),quick_math.deg_to_rad(camera.rotation[1]))
-    #    camera.move_x(forward_vec[0] * delta * 2)
-    #    camera.move_z(forward_vec[1] * delta * 2)
-
-    #if d_key.is_pressed :
-    #    forward_vec = rotate_2D_Vec((1,0),quick_math.deg_to_rad(camera.rotation[1]))
-    #    camera.move_x(forward_vec[0] * delta * 2)
-    #    camera.move_z(forward_vec[1] * delta * 2)
-
-    ##looking left and right
-    #if key_left.is_pressed :
-    #    camera.rotate_y(90 * delta,True)
-    
-    #if key_right.is_pressed :
-    #    camera.rotate_y(-90 * delta,True)
