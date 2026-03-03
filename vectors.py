@@ -32,7 +32,10 @@ class Vector2() :
 class Vector3() :
 
     def __init__(self,x:float = 0.0,y:float = 0.0,z:float = 0.0):
-        self.point = [x,y,z]
+        if type(x) == list or type(x) == tuple : ##parse from list
+            self.point = [x[0],x[1],x[2]]
+        else : ##basic three points provided
+            self.point = [x,y,z]
     
     def set_x(self,value : float) :
         self.point[0] = value

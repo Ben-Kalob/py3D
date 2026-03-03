@@ -18,7 +18,10 @@ def get_function_from_path(node_path : str,function_name : str,current_instance)
         return getattr(focus_node,function_name)
     else:
         objects_list : list = node_path.split(".")
+        print(objects_list)
+        print(current_instance.world.Nodes)
         focus_node : Node = current_instance.world.get_node(objects_list[0].replace("$",""))
+        print(f"{focus_node} sfafefewafe")
         objects_list.remove(objects_list[0])
         for node in objects_list :
             focus_node = focus_node.get_child(node)
@@ -87,6 +90,10 @@ class Node3D(Node) :
         Node3D.class_objects.append(self)
         super().__init__(object_name)
 
+    def destroy(self):
+        Node3D.class_objects.remove(self)
+        return super().destroy()
+
     def rotate_x(self,angle,should_wrap : bool = False) :
         new_x = self.rotation.get_x()+angle
         if should_wrap :
@@ -151,6 +158,7 @@ class WorldCamera(Node3D) :
         self.focal = 1/1300
         self.near_cull_distance = 0.05
         self.far_cull_distance = 20
-
+        
         super().__init__(object_name)
-        ##there WAS no super before, don't remeber why though
+
+        self.position.set_y(1)

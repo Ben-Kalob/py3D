@@ -14,8 +14,6 @@ from image_handler import load_image
 
 from vectors import Vector3
 
-Engine = None
-
 ##MESHES
 
 empty_mesh = [[],[]]
@@ -54,6 +52,7 @@ class BUFFERED_OBJ() :
 cube = Mesh3D("bobby",cube_mesh,color(0.1,0,0))
 cube.move_y(0.5)
 cube.rotate_y(45)
+#cube.move_z(-9)
 
 cube2 = Mesh3D("bobby2",cube_mesh,color(0,0.1,0))
 cube2.move_x(2)
@@ -71,23 +70,22 @@ cube3.move_z(-1)
 cube3.move_x(0.5)
 cube3.move_y(0.25)
 
-#sadcatbill = BillBoard3D("sadcar","img/sadcat.png")
-#sadcatbill.move_z(4)
-#sadcatbill.move_y(1)
-#sadcatbill.scale = 1
-
-camera = WorldCamera("camera")
-camera.move_y(1)
-camera.move_z(-5)
-
 light1 = Light3D("light",1,5)
 light1.move_y(1)
-light1.move_x(-3)
+light1.move_x(0)
+
+camera : WorldCamera = None
 
 class Engine3D() :
-    def __init__(self):
+
+    current = None
+
+    def __init__(self,window,engine):
+        Engine3D.current = self
         floor_range = 5
         floor_size = 1
+        self.engine = engine
+        self.window : Window = window
         for x in range(-floor_range,floor_range) :
             for y in range(-floor_range,floor_range) :
                 floor = Mesh3D("floor",plane_mesh,color(0.1,0.1,0.1))
@@ -95,7 +93,6 @@ class Engine3D() :
                 floor.move_x(x*floor_size)
                 floor.move_z(y*floor_size)
                 #floor.move_y(0)
-
 
 def UpdateFPS_display(fps : int) :
     pass
@@ -119,10 +116,10 @@ def get_normal_dir(from_point : Vector3,to_point : Vector3) -> Vector3 :
     return Vector3(x_dir,y_dir,z_dir)
 
 def Draw3D() :
-
-    tile.rotate_y(0.1)
-    tile.rotate_x(0.2)
     
+    if camera == None :
+        return 
+
     #Engine .canvas.delete("all") ##clear screen
     draw_queue : list[BUFFERED_OBJ] = []
     for object in Node3D.class_objects :
@@ -159,7 +156,6 @@ def Draw3D() :
                     #diff = distance(obj.normal,direction)
                     #print(diff)
 
-
                     #    power = light.energy / (dis/light.size)
                     #    obj.light_energy += power
 
@@ -185,10 +181,10 @@ def Draw3D() :
 
                 if ( position[0] > st.image.width() * -0.5 and position[1] < Window.root.winfo_screenwidth() ) :
 
-                    Engine.window.canvas.create_image(position[0],position[1],image = st.image)
+                    Engine3D.current.engine.window.canvas.create_image(position[0],position[1],image = st.image)
                     
-def calc_z_score(points) :
-    score = min([points[0][2],points[1][2],points[2][2]]) - max([points[0][1],points[1][1],points[2][1]]) + max([points[0][2],points[1][2],points[2][2]]) + min([points[0][1],points[1][1],points[2][1]])
+def calc_z_score(points : list[Vector3]) :
+    score = min([points[0].get_z(),points[1].get_z(),points[2].get_z()]) - max([points[0].get_y(),points[1].get_y(),points[2].get_y()]) + max([points[0].get_z(),points[1].get_z(),points[2].get_z()]) + min([points[0].get_y(),points[1].get_y(),points[2].get_y()])
     return score
         
 def calc_object(object,draw_queue : list):
@@ -205,13 +201,11 @@ def calc_object(object,draw_queue : list):
         cam_rot = combine_vec3(Vector3(),camera.rotation,True) ##invert 
         np = transform_rotation(np,cam_rot)
 
-        if np.get_z() < camera.far_cull_distance and np.get_z > camera.near_cull_distance * 4 :
+        if np.get_z() < camera.far_cull_distance and np.get_z() > camera.near_cull_distance * 4 :
             draw_queue.append(BUFFERED_OBJ(data=[object.image,np,object],type=BillBoard3D,world_position=object.position))
         
 def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
-    tri : list = [object_mesh[0][face[0]-1],object_mesh[0][face[1]-1],object_mesh[0][face[2]-1]]
-    
-    print(tri)
+    tri : list[Vector3] = [Vector3.parse(object_mesh[0][face[0]-1]),Vector3.parse(object_mesh[0][face[1]-1]),Vector3.parse(object_mesh[0][face[2]-1])]
 
     position : Vector3 = combine_vec3(object.position,camera.position,True)
     rotation : Vector3 = object.rotation
@@ -225,10 +219,11 @@ def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
     tri = [transform_position(tri[0],position),transform_position(tri[1],position),transform_position(tri[2],position)]
 
     ##camera rotation has to be applied after the first in order to work correctly
-    cam_rot = combine_vec3(Vector3(),camera.rotation,True) ##invert 
+    cam_rot = combine_vec3(Vector3(),camera.rotation,True) ##inverts
+    
     tri = [transform_rotation(tri[0],cam_rot),transform_rotation(tri[1],cam_rot),transform_rotation(tri[2],cam_rot)]
 
-    dis = max([tri[0][2],tri[1][2],tri[2][2]])
+    dis = max([tri[0].get_z(),tri[1].get_z(),tri[2].get_z()])
 
     ##if behind camera, skip rendering ##pretty important
     if dis < camera.near_cull_distance :
@@ -239,68 +234,74 @@ def calc_face(face,object,object_mesh,face_index,face_obj : list) -> any :
     color = object.color 
 
     if dis < camera.far_cull_distance :
-        face_obj.append(BUFFERED_OBJ(data=[tri,color,object_mesh],type=Mesh3D,world_position=object.position,normal=transform_rotation(object_mesh[2][face_index],rotation)))
+        face_obj.append(BUFFERED_OBJ(data=[tri,color,object_mesh],type=Mesh3D,world_position=object.position,normal=transform_rotation(Vector3(object_mesh[2][face_index]),rotation)))
         return face_obj
     
     face_index += 1
 
 def draw_triangle(triangle : list,color : color,fill : bool = True) -> bool :
-    
+
     start_point = screen_plot(triangle[0])
     if not start_point : return False
     mid_point = screen_plot(triangle[1])
     if not mid_point : return False
     end_point = screen_plot(triangle[2])
     if not end_point : return False
-
-    Engine.window.canvas.create_polygon(start_point,mid_point,end_point,fill=color.get_hex())
-
+    
+    Engine3D.current.window.canvas.create_polygon(start_point,mid_point,end_point,fill=color.get_hex())
+    
     return True
 
-def screen_plot(point : list) -> any : 
+def screen_plot(point : Vector3) -> any : ##returns either a boolean or a tuple for rendering
     ##usually it's /focal but it is set to 1/value to help skip the division for every tri
-    f = abs(point[2]*camera.focal)
-    if f == 0 :
+    f = (point.get_z()*camera.focal)
+    if f <= 0 :
         return False
     df = 1/f
-    new_point = ((point[0])*df + Engine.window.x_offset,(-point[1])*df + Engine.window.y_offset)
+    new_point = ((point.get_x())*df + Engine3D.current.window.x_offset,(-point.get_y())*df + Engine3D.current.window.y_offset)
     return new_point
 
 def transform_position(point : Vector3 ,position : Vector3) -> Vector3 :
     
-    new_point = (point[0] + position[0],point[1] + position[1],point[2] + position[2])
+    new_point = Vector3(point.get_x() + position.get_x(),point.get_y() + position.get_y(),point.get_z() + position.get_z())
     
     return new_point
 
 def transform_rotation(point : Vector3, rotation : Vector3) -> Vector3 :
 
-    z : Vector3 = rotate_2D_Vec((point.get_x(),point.get_y()),quick_math.deg_to_rad(rotation.get_z()))
+    z : Vector3 = rotate_2D_Vec(Vector2(point.get_x(),point.get_y()),quick_math.deg_to_rad(rotation.get_z()))
     new_point = Vector3(z.get_x(),z.get_y(),point.get_z())
+    ## 0 1 2
+    ## 0 1 2
 
-    y : Vector3 = rotate_2D_Vec((new_point.get_x(),new_point.get_z()),quick_math.deg_to_rad(rotation.get_y()))
+    y : Vector3 = rotate_2D_Vec(Vector2(new_point.get_x(),new_point.get_z()),quick_math.deg_to_rad(rotation.get_y()))
     new_point = Vector3(y.get_x(),new_point.get_y(),y.get_y())
+    ## 0 2 1
+    ## 0 1 1
 
-    x : Vector3 = rotate_2D_Vec((new_point.get_x(),new_point.get_z()),quick_math.deg_to_rad(rotation.get_x()))
+    x : Vector3 = rotate_2D_Vec(Vector2(new_point.get_y(),new_point.get_z()),quick_math.deg_to_rad(rotation.get_x()))
     new_point = Vector3(new_point.get_x(),x.get_x(),x.get_y())
-    
+    ## 0 2 0
+    ## 0 0 1
+
     return new_point
 
 def distance(point_1 : Vector3, point_2 : Vector3) -> float :
     return math.sqrt( pow(point_2.get_x() - point_1.get_x(),2) + pow(point_2.get_y() - point_1.get_y(),2) + pow(point_2.get_z() - point_1.get_z(),2) )
 
-def transform_scale(point : list,scale) -> Vector3 :
-    point = Vector3(point[0]*scale,point[1]*scale,point[2]*scale)
+def transform_scale(point : Vector3,scale) -> Vector3 :
+    point = Vector3(point.get_x()*scale,point.get_y()*scale,point.get_z()*scale)
     return point
 
-def rotate_2D_Vec(vector : Vector3,angle : float) :
+def rotate_2D_Vec(vector : Vector2,angle : float) -> Vector2 :
     
     s = math.sin(angle)
     c = math.cos(angle)
 
-    x = c * vector[0] - s * vector[1]
-    y = s * vector[0] + c * vector[1]
+    x = c * vector.get_x() - s * vector.get_y()
+    y = s * vector.get_x() + c * vector.get_y()
 
-    return (x,y)
+    return Vector2(x,y)
 
 def total(values : list) -> float :
     total : float = 0
@@ -311,7 +312,7 @@ def total(values : list) -> float :
 def average(values : list) -> float :
     return total(values) / len(values)
 
-def combine_vec3(l1 : Vector3, l2 : Vector3, subtract : bool = False) -> list :
+def combine_vec3(l1 : Vector3, l2 : Vector3, subtract : bool = False) -> Vector3 :
 
     multi : int = 1
 
@@ -324,3 +325,4 @@ def combine_vec3(l1 : Vector3, l2 : Vector3, subtract : bool = False) -> list :
     return Vector3(x,y,z)
 
 
+print(transform_rotation(Vector3([0,1,0]),Vector3([1,6,8])))

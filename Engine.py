@@ -27,7 +27,7 @@ class World() :
     active_world = None
 
     def __init__(self):
-        self.Nodes : list = {}
+        self.Nodes : dict = {}
         World.active_world = self
 
     def clear(self) :
@@ -39,11 +39,12 @@ class World() :
         return self.Nodes[node_name]
 
     def register_node(self,node : Node) :
+        print(node.name)
         self.Nodes[node.name] = node
 
     def node(self,data : dict) :
         node = Node(data["name"])
-        self.Nodes[data["name"]] = node
+        self.register_node(node)
 
     def sprite2d(self,data : dict) :
         scale : float = 1
@@ -54,6 +55,12 @@ class World() :
         node.position = Vector2(position[0],position[1])
         self.register_node(node)
     
+    def camera(self,data : dict) :
+        node = WorldCamera(data["name"])
+        py3D.camera = node
+        self.register_node(node)
+
+    
 class Engine() :
 
     current_instance = None
@@ -62,7 +69,7 @@ class Engine() :
         Engine.current_instance = self
         config = self.load_config()
         self.window = Window(size=Vector2.parse(config["win_size"]))
-        py3D.Engine = self
+        self.Engine3D = py3D.Engine3D(self.window,self)
         self.world = World()
         self.current_script = config["starting_script"]
         self.input = InputHandler(self.window,self)
@@ -87,11 +94,13 @@ class Engine() :
             self.process(delta,previous_time)
     
     def Draw2D(self) :
-        self.window.canvas.delete("all")
         for node in Node2D.instances :
             if node.visible :
                 if type(node) == Sprite2D :
                     self.window.canvas.create_image(node.position.get_x(),node.position.get_y(),image=node.image_data)
+
+    def Draw3D(self) :
+        py3D.Draw3D()
 
     def load_config(self) -> dict :
         conf = json.loads(open(get_real_path("conf.lbls")).readline())
@@ -142,19 +151,24 @@ class Engine() :
                     class_name = data["class"].lower()
                     if hasattr(self.world,class_name) :
                         getattr(self.world,class_name)(data)
+                    else: print(f"type {class_name} does NOT exist")
 
     def process(self,delta : float,previous_time : float) :
-
+        
         previous_time = time.time()
 
-        self.window.root.focus_force()
+        self.window.canvas.focus_force()
 
         for func in self.process_functions : func()
 
         self.input.process()
         
-        self.Draw2D()
-        py3D.Draw3D()
+        self.window.clear_render()
+        
+        self.Draw3D()
+        #self.Draw2D()
+        print(self.world.Nodes)
+
         self.window.refresh()
 
         delta = time.time() - previous_time
