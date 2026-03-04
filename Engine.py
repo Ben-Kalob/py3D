@@ -17,7 +17,10 @@ from vectors import Vector2
 
 from parser import *
 
+from Colourz import color
+
 import py3D
+import Meshes
 
 from Tree import get_function_from_path
 from Tree import *
@@ -38,28 +41,66 @@ class World() :
     def get_node(self,node_name : str) :
         return self.Nodes[node_name]
 
-    def register_node(self,node : Node) :
-        print(node.name)
-        self.Nodes[node.name] = node
+    def register_node(self,node : Node,data : dict) :
+        if data.__contains__("parent") : ##if assigned to parent, make that connection
+            parent_node : Node = self.get_node(data["parent"])
+            parent_node.add_child(node)
+        else: ##otherwise, add to tree
+            self.Nodes[node.name] = node
 
     def node(self,data : dict) :
         node = Node(data["name"])
-        self.register_node(node)
+        self.register_node(node,data)
 
-    def sprite2d(self,data : dict) :
+    def sprite(self,data : dict) :
         scale : float = 1
         if data.__contains__("scale") :
             scale = data["scale"]
         node = Sprite2D(data["name"],data["img"],scale)
         position : list = data["pos"]
         node.position = Vector2(position[0],position[1])
-        self.register_node(node)
+        self.register_node(node,data)
     
-    def camera(self,data : dict) :
-        node = WorldCamera(data["name"])
-        py3D.camera = node
-        self.register_node(node)
+    def set_up_node3d(self,node,data : dict) :
+        if data.__contains__("pos") :
+            node.position = Vector3(data["pos"])
+        if data.__contains__("rot") :
+            node.rotation = Vector3(data["rot"])
 
+    def playerbody(self,data : dict) :
+        node : PlayerBody = PlayerBody(data["name"])
+        self.set_up_node3d(node,data)
+        self.register_node(node,data)
+
+    def camera(self,data : dict) :
+        node : WorldCamera = WorldCamera(data["name"])
+        self.set_up_node3d(node,data)
+        py3D.camera = node
+        self.register_node(node,data)
+
+    def node3d(self,data : dict) :
+        node : Node3D = Node3D(data["name"])
+        self.set_up_node3d(node,data)
+        self.register_node(node,data)
+    
+    def mesh(self,data : dict) :
+        obj_color = color(0)
+        if data.__contains__("color") :
+            obj_color = color(data["color"])
+        node : Mesh3D = Mesh3D(data["name"],Meshes.mapper[data["mesh"]](),obj_color)
+        self.set_up_node3d(node,data)
+        self.register_node(node,data)
+
+    def light(self,data : dict) :
+        power : float = 1
+        range : float = 10
+        if data.__contains__("power") :
+            power = data["power"]
+        if data.__contains__("range") :
+            range = data["range"]
+        node = Light3D(data["name"],power,range)
+        self.set_up_node3d(node,data)
+        self.register_node(node,data)
     
 class Engine() :
 
@@ -159,6 +200,8 @@ class Engine() :
 
         self.window.canvas.focus_force()
 
+        PhysicsBody.process() ##process physics
+
         for func in self.process_functions : func()
 
         self.input.process()
@@ -166,8 +209,7 @@ class Engine() :
         self.window.clear_render()
         
         self.Draw3D()
-        #self.Draw2D()
-        print(self.world.Nodes)
+        self.Draw2D()
 
         self.window.refresh()
 

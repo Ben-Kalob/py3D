@@ -2,10 +2,15 @@ import qmath as quick_math
 
 class color() :
 
-    def __init__(self,r : float, g : float, b : float):
-        self.r = r
-        self.g = g
-        self.b = b
+    def __init__(self,r : float, g : float = 0.0, b : float = 0.0):
+        if type(r) == float or type(r) == int :
+            self.r = r
+            self.g = g
+            self.b = b
+        elif type(r) == list :
+            self.r = r[0]
+            self.g = r[1]
+            self.b = r[2]
 
     def copy(self) -> object :
         return color(self.r,self.g,self.b)

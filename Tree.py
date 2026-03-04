@@ -44,6 +44,12 @@ class Node() :
         except :
             return None
     
+    def global_position() -> Vector3 :
+        return Vector3() ##defaults to empty
+
+    def global_rotation() -> Vector3 :
+        return Vector3() ##defaults to empty
+
     def destroy(self) :
         for child in self.children :
             self.children[child].destroy()
@@ -94,6 +100,18 @@ class Node3D(Node) :
         Node3D.class_objects.remove(self)
         return super().destroy()
 
+    def global_position(self) -> Vector3 :
+        if self.parent != None and isinstance(self.parent,Node3D) :
+            return self.position + self.parent.global_position()
+        else : 
+            return self.position
+
+    def global_rotation(self) -> Vector3 :
+        if self.parent != None and isinstance(self.parent,Node3D) :
+            return self.rotation + self.parent.global_rotation()
+        else : 
+            return self.rotation
+
     def rotate_x(self,angle,should_wrap : bool = False) :
         new_x = self.rotation.get_x()+angle
         if should_wrap :
@@ -126,7 +144,7 @@ class Node3D(Node) :
 
 class Light3D(Node3D) :
 
-    all_lights : list = []
+    all_lights : list[Light3D] = []
 
     def __init__(self, object_name,energy : float,size : float = 10):
         self.energy = energy
@@ -149,7 +167,37 @@ class Mesh3D(Node3D) :
         self.color = color
 
         super().__init__(object_name)
+
+class PhysicsBody(Node3D) :
     
+    physic_instances : list[PhysicsBody] = []
+
+    def __init__(self, object_name):
+        PhysicsBody.physic_instances.append(self)
+        self.velocity = Vector3()  ##note: VELOCITY IS RELATIVE TO THE ANGLE OF THE OBJECT!!!
+        super().__init__(object_name)
+    
+    def process() :
+        for body in PhysicsBody.physic_instances :
+            body.position += body.velocity.rotated_around_y_axis(body.global_rotation().get_y())
+            if isinstance(body,PlayerBody) :
+                body.velocity = Vector3()
+    
+    def set_x_velocity(self,value) :
+        self.velocity.set_x(value)
+
+    def set_y_velocity(self,value) :
+        self.velocity.set_y(value)
+    
+    def set_z_velocity(self,value) :
+        self.velocity.set_z(value)
+    
+    
+
+class PlayerBody(PhysicsBody) :
+    pass
+    
+
 class WorldCamera(Node3D) :
 
     def __init__(self, object_name):
@@ -157,8 +205,6 @@ class WorldCamera(Node3D) :
         
         self.focal = 1/1300
         self.near_cull_distance = 0.05
-        self.far_cull_distance = 20
+        self.far_cull_distance = 25
         
         super().__init__(object_name)
-
-        self.position.set_y(1)
