@@ -7,7 +7,7 @@ class Window :
     
     def __init__(self,size : Vector2):
         self.root = tkinter.Tk("Test01",sync=True)
-        self.canvas = tkinter.Canvas(self.root,background="white")
+        self.canvas = tkinter.Canvas(self.root,background="black")
         self.frame = tkinter.Frame(self.root,background="white")
         self.set_size(size)
         self.canvas.pack()

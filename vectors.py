@@ -88,6 +88,10 @@ class Vector3() :
         if type(other) == Vector3 :
             return Vector3(self.point[0]+other.point[0],self.point[1]+other.point[1],self.point[2]+other.point[2])
     
+    def __sub__(self, other):
+        if type(other) == Vector3 :
+            return Vector3(self.point[0]-other.point[0],self.point[1]-other.point[1],self.point[2]-other.point[2])
+
     def __iadd__(self, other):
         return self.__add__(other)
 

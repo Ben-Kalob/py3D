@@ -102,6 +102,17 @@ class World() :
         self.set_up_node3d(node,data)
         self.register_node(node,data)
     
+    def floor(self,data : dict) :
+        size = Vector2()
+        if data.__contains__("size") :
+            size = Vector2.parse(data["size"])
+        obj_color = color(0)
+        if data.__contains__("color") :
+            obj_color = color(data["color"])
+        node = Floor3D(data["name"],size,obj_color)
+        self.set_up_node3d(node,data)
+        self.register_node(node,data)
+    
 class Engine() :
 
     current_instance = None

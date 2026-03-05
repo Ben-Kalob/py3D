@@ -68,7 +68,7 @@ def Draw3D() :
             calc_object(object,draw_queue)
             #obj_thread = Thread(target=calc_object,args=(object,draw_queue))
             #threads.append(obj_thread)
-
+    
     for obj in draw_queue :
         #centriod = [average([points[0][0],points[1][0],points[2][0]]),average([points[0][1],points[1][1],points[2][1]]),average([points[0][2],points[1][2],points[2][2]])]
         #I don't really understand how this ended up working, I just kept trying stuff till it work :\
@@ -129,7 +129,6 @@ def calc_z_score(points : list[Vector3]) :
     y_list = [points[0].get_y(),points[1].get_y(),points[2].get_y()]
     z_list = [points[0].get_z(),points[1].get_z(),points[2].get_z()]
     score =  min(z_list) + max(z_list) + (max(y_list)-min(y_list)) + min(y_list) - max(y_list)
-    print(score)
     return score
         
 def calc_object(object,draw_queue : list):
@@ -179,7 +178,7 @@ def calc_face(face,object : Node3D,object_mesh : Meshes.Mesh,face_index,face_obj
     color = object.color 
 
     if dis < camera.far_cull_distance :
-        face_obj.append(BUFFERED_OBJ(data=[tri,color,object_mesh],type=Mesh3D,world_position=object.position,normal=transform_rotation(Vector3(object_mesh.normal_vectors[face_index]),rotation)))
+        face_obj.append(BUFFERED_OBJ(data=[tri,color,object_mesh],type=Mesh3D,world_position=object.global_position(),normal=transform_rotation(Vector3(object_mesh.normal_vectors[face_index]),rotation)))
         return face_obj
     
     face_index += 1
@@ -193,8 +192,21 @@ def draw_triangle(triangle : list,color : color,fill : bool = True) -> bool :
     end_point = screen_plot(triangle[2])
     if not end_point : return False
     
-    Engine3D.current.window.canvas.create_polygon(start_point,mid_point,end_point,fill=color.get_hex())
+    ##draw if at least one point is on screen
+    if is_point_on_screen(start_point) or is_point_on_screen(mid_point) or is_point_on_screen(end_point) :
+        Engine3D.current.window.canvas.create_polygon(start_point,mid_point,end_point,fill=color.get_hex())
+        return True
+
+def is_point_on_screen(point : tuple) :
+    win_size : Vector2 = Engine3D.current.window.size
+    margin : int = 20
     
+    if point[0] < -margin : return False
+    if point[0] > win_size.get_x() + margin : return False
+
+    if point[1] < -margin : return False
+    if point[1] > win_size.get_y() + margin : return False
+
     return True
 
 def screen_plot(point : Vector3) -> any : ##returns either a boolean or a tuple for rendering
@@ -268,6 +280,3 @@ def combine_vec3(l1 : Vector3, l2 : Vector3, subtract : bool = False) -> Vector3
     z = l1.get_z() + l2.get_z() * multi
 
     return Vector3(x,y,z)
-
-
-print(transform_rotation(Vector3([0,1,0]),Vector3([1,6,8])))

@@ -6,6 +6,7 @@ from image_handler import load_image
 import math
 import qmath as quick_math
 from Colourz import color
+import Meshes
 
 def get_function_from_path(node_path : str,function_name : str,current_instance) -> any :
     if not node_path.__contains__("$") :
@@ -18,10 +19,7 @@ def get_function_from_path(node_path : str,function_name : str,current_instance)
         return getattr(focus_node,function_name)
     else:
         objects_list : list = node_path.split(".")
-        print(objects_list)
-        print(current_instance.world.Nodes)
         focus_node : Node = current_instance.world.get_node(objects_list[0].replace("$",""))
-        print(f"{focus_node} sfafefewafe")
         objects_list.remove(objects_list[0])
         for node in objects_list :
             focus_node = focus_node.get_child(node)
@@ -162,11 +160,28 @@ class BillBoard3D(Node3D) :
 
 class Mesh3D(Node3D) :
 
-    def __init__(self,object_name,mesh : list,color : color):
+    def __init__(self,object_name,mesh : Meshes.Mesh,color : color):
         self.mesh = mesh
         self.color = color
 
         super().__init__(object_name)
+
+class Floor3D(Node3D) :
+
+    def __init__(self, object_name,size = Vector2(5,5),obj_color = color(0.2,0.2,0.2)):
+
+        super().__init__(object_name)
+
+        for x in range(int(size.get_x())) :
+            for y in range(int(size.get_y())) :
+                node : Mesh3D = Mesh3D(f"floor_{x}_{y}",Meshes.PlaneMesh(),obj_color)
+                node.position = self.position - Vector3(size.get_x()/2,0,size.get_y()/2)
+                node.move_x(x )
+                node.move_z(y )
+                self.add_child(node)
+                
+
+        
 
 class PhysicsBody(Node3D) :
     
@@ -192,7 +207,7 @@ class PhysicsBody(Node3D) :
     def set_z_velocity(self,value) :
         self.velocity.set_z(value)
     
-    
+
 
 class PlayerBody(PhysicsBody) :
     pass
