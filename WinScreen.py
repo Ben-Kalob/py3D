@@ -29,7 +29,7 @@ class Window :
     def full_clear(self) :
         for element in self.elements :
             element.destroy()
-            self.elements = []
+        self.elements = []
 
     def refresh(self) :
         self.root.update()

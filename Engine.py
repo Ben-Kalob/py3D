@@ -129,6 +129,11 @@ class Engine() :
         self.running = True
         self.frame_time = 1/float(config["frame_rate"])
         self.process_functions : list = []
+        
+        ##hacky fix to add frame display without adding it to the registor
+        self.frame_display = self.element_assembler.text({"pos" : [0,0],"text" : "test", "color" : [1,1,1]})
+        self.window.elements = []
+        
         self.start()
 
     def quit(self) :
@@ -226,6 +231,8 @@ class Engine() :
 
         delta = time.time() - previous_time
         
+        self.frame_display.config(text= "fps: " + str(round(1/delta,2)))
+
         if delta < self.frame_time :
             time.sleep(self.frame_time-delta)
         
@@ -237,7 +244,7 @@ class ElementAssembler() :
         self.engine = engine
         self.window = engine.window
     
-    def text(self,data : dict) :
+    def text(self,data : dict) -> any :
         position : Vector2 = Vector2.parse(data["pos"])
         font : str = None
         if data.__contains__("font") :
@@ -245,10 +252,14 @@ class ElementAssembler() :
         font_size : int = 12
         if data.__contains__("font_size") :
             font_size = data["font_size"]
-        text = tkinter.Label(self.window.root,text=data["text"],anchor="center",font=(font,font_size),bg=ElementAssembler.transparent_color)
-        pywinstyles.set_opacity(text,color=ElementAssembler.transparent_color)
-        text.place(x=position.get_x(),y=position.get_y())
-        self.window.elements.append(text)
+        text_color = color(0)
+        if data.__contains__("color") :
+            text_color = color(data["color"])
+        text_obj = tkinter.Label(self.window.root,text=data["text"],anchor="center",font=(font,font_size),bg=ElementAssembler.transparent_color,foreground=text_color.get_hex())
+        pywinstyles.set_opacity(text_obj,color=ElementAssembler.transparent_color)
+        text_obj.place(x=position.get_x(),y=position.get_y())
+        self.window.elements.append(text_obj)
+        return text_obj
 
     def button(self,data : dict) :
         position : Vector2 = Vector2.parse(data["pos"])

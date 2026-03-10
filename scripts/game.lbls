@@ -1,0 +1,28 @@
+{"type":"scene"}
+
+##setting up player in the scene
+{"type" : "obj" , "class" : "playerbody" , "name" : "player" , "pos" : [2,0,1] , "rot" : [0,100,0] }
+{"type" : "obj" , "class" : "camera" , "name" : "camera" , "pos" : [0,1,0], "parent" : "player"}
+
+##looking left and right
+{"type" : "input", "key" : "Left" , "func" : "$player;rotate_y;2.5", "process" : "True"}
+{"type" : "input", "key" : "Right" , "func" : "$player;rotate_y;-2.5", "process" : "True"}
+
+##movement
+{"type" : "input", "key" : "w" , "func" : "$player;set_z_velocity;0.1", "process" : "True"}
+{"type" : "input", "key" : "s" , "func" : "$player;set_z_velocity;-0.1", "process" : "True"}
+
+{"type" : "input", "key" : "a" , "func" : "$player;set_x_velocity;-0.1", "process" : "True"}
+{"type" : "input", "key" : "d" , "func" : "$player;set_x_velocity;0.1", "process" : "True"}
+
+##set up meshes
+
+{"type" : "obj" , "class" : "mesh" , "name" : "test cube" , "pos" : [-5,1,-1] , "rot" : [0,0,0] , "mesh" : "cube" , "color" : [0,0,0.1]}
+
+
+{"type" : "obj" , "class" : "floor" , "name" : "floor1" , "pos" : [0,-0.5,0] , "rot" : [0,0,0] , "color" : [0.1,0.1,0.1], "size" : [25,25]}
+
+
+{"type" : "obj" , "class" : "light" , "name" : "main light" , "pos" : [0,1,0] , "power" : 1 , "range" : 10 }
+
+{"type" : "func" , "path" : "$test cube;rotate_y;2" , "process" : "true"}

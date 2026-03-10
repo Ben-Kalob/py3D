@@ -36,10 +36,6 @@ class Engine3D() :
         self.engine = engine
         self.window : Window = window
 
-def UpdateFPS_display(fps : int) :
-    pass
-    #fps_label.config(text=str(fps) + " -fps")
-
 def get_normal_dir(from_point : Vector3,to_point : Vector3) -> Vector3 :
     x_dir = 0
     y_dir = 0
